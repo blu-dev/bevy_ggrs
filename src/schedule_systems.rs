@@ -1,7 +1,7 @@
 use crate::{
-    AdvanceWorld, Checksum, ConfirmedFrameCount, FixedTimestepData, LoadWorld, LocalInputs,
-    LocalPlayers, MaxPredictionWindow, PlayerInputs, ReadInputs, RollbackFrameCount,
-    RollbackFrameRate, SaveWorld, Session,
+    AdvanceWorld, Checksum, ConfirmedFrameCount, DontUseFixedTimestep, FixedTimestepData,
+    LoadWorld, LocalInputs, LocalPlayers, MaxPredictionWindow, PlayerInputs, ReadInputs,
+    RollbackFrameCount, RollbackFrameRate, SaveWorld, Session,
 };
 use bevy::{prelude::*, utils::Duration};
 use ggrs::{
@@ -9,22 +9,33 @@ use ggrs::{
 };
 
 pub(crate) fn run_ggrs_schedules<T: Config>(world: &mut World) {
-    let framerate: usize = **world.get_resource_or_insert_with::<RollbackFrameRate>(default);
+    let run_count = if !world.contains_resource::<DontUseFixedTimestep>() {
+        let framerate: usize = **world.get_resource_or_insert_with::<RollbackFrameRate>(default);
 
-    let mut time_data = world
-        .remove_resource::<FixedTimestepData>()
-        .expect("failed to extract GGRS FixedTimeStepData");
+        let mut time_data = world
+            .remove_resource::<FixedTimestepData>()
+            .expect("failed to extract GGRS FixedTimeStepData");
 
-    let delta = world
-        .get_resource::<Time>()
-        .expect("Time resource not found, did you remove it?")
-        .delta();
+        let delta = world
+            .get_resource::<Time>()
+            .expect("Time resource not found, did you remove it?")
+            .delta();
 
-    let mut fps_delta = 1. / framerate as f64;
-    if time_data.run_slow {
-        fps_delta *= 1.1;
-    }
-    time_data.accumulator = time_data.accumulator.saturating_add(delta);
+        let mut fps_delta = 1. / framerate as f64;
+        if time_data.run_slow {
+            fps_delta *= 1.1;
+        }
+        time_data.accumulator = time_data.accumulator.saturating_add(delta);
+
+        let count = (time_data.accumulator.as_secs_f64() / fps_delta).trunc() as usize;
+        time_data.accumulator = time_data
+            .accumulator
+            .saturating_sub(Duration::from_secs_f64(fps_delta * count as f64));
+        world.insert_resource(time_data);
+        count
+    } else {
+        1
+    };
 
     // no matter what, poll remotes and send responses
     if let Some(mut session) = world.get_resource_mut::<Session<T>>() {
@@ -40,27 +51,22 @@ pub(crate) fn run_ggrs_schedules<T: Config>(world: &mut World) {
     }
 
     // if we accumulated enough time, do steps
-    while time_data.accumulator.as_secs_f64() > fps_delta {
-        // decrease accumulator
-        time_data.accumulator = time_data
-            .accumulator
-            .saturating_sub(Duration::from_secs_f64(fps_delta));
-
+    for _ in 0..run_count {
         // depending on the session type, doing a single update looks a bit different
         let session = world.remove_resource::<Session<T>>();
         match session {
             Some(Session::SyncTest(s)) => run_synctest::<T>(world, s),
             Some(Session::P2P(session)) => {
                 // if we are ahead, run slow
-                time_data.run_slow = session.frames_ahead() > 0;
+                // time_data.run_slow = session.frames_ahead() > 0;
 
                 run_p2p(world, session);
             }
             Some(Session::Spectator(s)) => run_spectator(world, s),
             _ => {
                 // No session has been started yet, reset time data and snapshots
-                time_data.accumulator = Duration::ZERO;
-                time_data.run_slow = false;
+                // time_data.accumulator = Duration::ZERO;
+                // time_data.run_slow = false;
                 world.insert_resource(LocalPlayers::default());
                 world.insert_resource(RollbackFrameCount(0));
                 world.insert_resource(ConfirmedFrameCount(-1));
@@ -68,8 +74,6 @@ pub(crate) fn run_ggrs_schedules<T: Config>(world: &mut World) {
             }
         }
     }
-
-    world.insert_resource(time_data);
 }
 
 pub(crate) fn run_synctest<C: Config>(world: &mut World, mut sess: SyncTestSession<C>) {

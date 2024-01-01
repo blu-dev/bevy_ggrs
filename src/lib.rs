@@ -9,7 +9,7 @@ use bevy::{
         schedule::{ExecutorKind, LogLevel, ScheduleBuildSettings, ScheduleLabel},
     },
     prelude::*,
-    utils::{Duration, HashMap},
+    utils::{intern::Interned, Duration, HashMap},
 };
 use ggrs::{Config, InputStatus, P2PSession, PlayerHandle, SpectatorSession, SyncTestSession};
 use std::{fmt::Debug, hash::Hash, marker::PhantomData, net::SocketAddr};
@@ -137,6 +137,9 @@ pub struct SaveWorld;
 #[derive(ScheduleLabel, Debug, Hash, PartialEq, Eq, Clone)]
 pub struct AdvanceWorld;
 
+#[derive(Resource, Debug, Copy, Clone, PartialEq)]
+pub struct DontUseFixedTimestep;
+
 /// GGRS plugin for bevy.
 ///
 /// # Rollback
@@ -178,13 +181,26 @@ pub struct AdvanceWorld;
 /// # }
 /// ```
 pub struct GgrsPlugin<C: Config> {
+    schedule: Interned<dyn ScheduleLabel>,
     /// phantom marker for ggrs config
     _marker: PhantomData<C>,
 }
 
+impl<C: Config> GgrsPlugin<C> {
+    pub fn new(update_schedule: impl ScheduleLabel) -> Self {
+        Self {
+            schedule: update_schedule.intern(),
+            _marker: default(),
+        }
+    }
+}
+
 impl<C: Config> Default for GgrsPlugin<C> {
     fn default() -> Self {
-        Self { _marker: default() }
+        Self {
+            schedule: PreUpdate.intern(),
+            _marker: default(),
+        }
     }
 }
 
@@ -210,13 +226,16 @@ impl<C: Config> Plugin for GgrsPlugin<C> {
                     ..default()
                 });
             })
-            .add_systems(PreUpdate, schedule_systems::run_ggrs_schedules::<C>)
+            .add_systems(
+                self.schedule.clone(),
+                schedule_systems::run_ggrs_schedules::<C>,
+            )
             .add_plugins((
                 SnapshotSetPlugin,
                 ChecksumPlugin,
                 EntitySnapshotPlugin,
                 EntityChecksumPlugin,
-                GgrsTimePlugin,
+                // GgrsTimePlugin,
                 ResourceSnapshotPlugin::<CloneStrategy<RollbackOrdered>>::default(),
                 ComponentSnapshotPlugin::<ReflectStrategy<Parent>>::default(),
                 ComponentMapEntitiesPlugin::<Parent>::default(),
