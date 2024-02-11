@@ -26,6 +26,8 @@ pub(crate) mod schedule_systems;
 pub(crate) mod snapshot;
 pub(crate) mod time;
 
+pub use schedule_systems::{poll_session, run_session};
+
 pub mod prelude {
     pub use crate::{
         snapshot::prelude::*, AddRollbackCommandExtension, GgrsApp, GgrsConfig, GgrsPlugin,
@@ -210,23 +212,28 @@ impl<C: Config> Plugin for GgrsPlugin<C> {
                     ambiguity_detection: LogLevel::Error,
                     ..default()
                 });
-            })
-            .add_systems(
+            });
+
+        #[cfg(not(feature = "custom-runner"))]
+        {
+            app.add_systems(
                 PreUpdate,
-                schedule_systems::run_ggrs_schedules::<C>.after(InputSystem),
-            )
-            .add_plugins((
-                SnapshotSetPlugin,
-                ChecksumPlugin,
-                EntitySnapshotPlugin,
-                EntityChecksumPlugin,
-                GgrsTimePlugin,
-                ResourceSnapshotPlugin::<CloneStrategy<RollbackOrdered>>::default(),
-                ComponentSnapshotPlugin::<ReflectStrategy<Parent>>::default(),
-                ComponentMapEntitiesPlugin::<Parent>::default(),
-                ComponentSnapshotPlugin::<ReflectStrategy<Children>>::default(),
-                ComponentMapEntitiesPlugin::<Children>::default(),
-            ));
+                schedule_systems::default_ggrs_runner::<C>.after(InputSystem),
+            );
+        }
+
+        app.add_plugins((
+            SnapshotSetPlugin,
+            ChecksumPlugin,
+            EntitySnapshotPlugin,
+            EntityChecksumPlugin,
+            // GgrsTimePlugin,
+            ResourceSnapshotPlugin::<CloneStrategy<RollbackOrdered>>::default(),
+            // ComponentSnapshotPlugin::<ReflectStrategy<Parent>>::default(),
+            // ComponentMapEntitiesPlugin::<Parent>::default(),
+            // ComponentSnapshotPlugin::<ReflectStrategy<Children>>::default(),
+            // ComponentMapEntitiesPlugin::<Children>::default(),
+        ));
     }
 }
 

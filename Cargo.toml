@@ -14,6 +14,7 @@ categories = ["network-programming", "game-development"]
 
 [features]
 wasm-bindgen = ["instant/wasm-bindgen", "ggrs/wasm-bindgen"]
+custom-runner = []
 
 [dependencies]
 bevy = { version = "0.12", default-features = false }

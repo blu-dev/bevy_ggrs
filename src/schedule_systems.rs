@@ -8,7 +8,30 @@ use ggrs::{
     Config, GgrsError, GgrsRequest, P2PSession, SessionState, SpectatorSession, SyncTestSession,
 };
 
-pub(crate) fn run_ggrs_schedules<T: Config>(world: &mut World) {
+pub fn poll_session<T: Config>(world: &mut World) {
+    if let Some(mut session) = world.get_resource_mut::<Session<T>>() {
+        match &mut *session {
+            Session::P2P(session) => session.poll_remote_clients(),
+            Session::Spectator(session) => session.poll_remote_clients(),
+            _ => {}
+        }
+    }
+}
+
+pub fn run_session<T: Config>(world: &mut World, session: Session<T>) -> bool {
+    let mut is_ahead = false;
+    match session {
+        Session::SyncTest(s) => run_synctest(world, s),
+        Session::P2P(s) => {
+            is_ahead = s.frames_ahead() > 0;
+            run_p2p(world, s);
+        }
+        Session::Spectator(s) => run_spectator(world, s),
+    }
+    is_ahead
+}
+
+pub(crate) fn default_ggrs_runner<T: Config>(world: &mut World) {
     let framerate: usize = **world.get_resource_or_insert_with::<RollbackFrameRate>(default);
 
     let mut time_data = world
@@ -27,17 +50,7 @@ pub(crate) fn run_ggrs_schedules<T: Config>(world: &mut World) {
     time_data.accumulator = time_data.accumulator.saturating_add(delta);
 
     // no matter what, poll remotes and send responses
-    if let Some(mut session) = world.get_resource_mut::<Session<T>>() {
-        match &mut *session {
-            Session::P2P(session) => {
-                session.poll_remote_clients();
-            }
-            Session::Spectator(session) => {
-                session.poll_remote_clients();
-            }
-            _ => {}
-        }
-    }
+    poll_session::<T>(world);
 
     // if we accumulated enough time, do steps
     while time_data.accumulator.as_secs_f64() > fps_delta {
@@ -47,17 +60,11 @@ pub(crate) fn run_ggrs_schedules<T: Config>(world: &mut World) {
             .saturating_sub(Duration::from_secs_f64(fps_delta));
 
         // depending on the session type, doing a single update looks a bit different
-        let session = world.remove_resource::<Session<T>>();
-        match session {
-            Some(Session::SyncTest(s)) => run_synctest::<T>(world, s),
-            Some(Session::P2P(session)) => {
-                // if we are ahead, run slow
-                time_data.run_slow = session.frames_ahead() > 0;
-
-                run_p2p(world, session);
+        match world.remove_resource::<Session<T>>() {
+            Some(session) => {
+                time_data.run_slow = run_session(world, session);
             }
-            Some(Session::Spectator(s)) => run_spectator(world, s),
-            _ => {
+            None => {
                 // No session has been started yet, reset time data and snapshots
                 time_data.accumulator = Duration::ZERO;
                 time_data.run_slow = false;
