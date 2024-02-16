@@ -104,7 +104,7 @@ impl From<RollbackFrameCount> for i32 {
 
 /// The most recently confirmed frame. Any information for frames stored before this point can be safely discarded.
 #[derive(Resource, Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct ConfirmedFrameCount(i32);
+pub struct ConfirmedFrameCount(pub i32);
 
 impl From<ConfirmedFrameCount> for i32 {
     fn from(value: ConfirmedFrameCount) -> i32 {
@@ -114,7 +114,7 @@ impl From<ConfirmedFrameCount> for i32 {
 
 /// The maximum prediction window for this [`Session`], provided as a concrete [`Resource`].
 #[derive(Resource, Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct MaxPredictionWindow(usize);
+pub struct MaxPredictionWindow(pub usize);
 
 /// Inputs from local players. You have to fill this resource in the ReadInputs schedule.
 #[derive(Resource)]
