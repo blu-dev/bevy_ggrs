@@ -1,9 +1,11 @@
 use bevy::{
-    input::{keyboard::KeyboardInput, ButtonState, Input, InputPlugin},
+    input::{
+        keyboard::{Key, KeyboardInput},
+        ButtonState, InputPlugin,
+    },
     prelude::*,
     time::TimeUpdateStrategy,
     utils::{Duration, HashMap},
-    MinimalPlugins,
 };
 use bevy_ggrs::{
     AddRollbackCommandExtension, GgrsConfig, GgrsPlugin, GgrsSchedule, LocalInputs, LocalPlayers,
@@ -55,7 +57,7 @@ fn it_syncs_rollback_components() -> Result<(), Box<dyn std::error::Error>> {
     let mut app2 = create_app::<TestConfig>(session2);
 
     for _ in 0..50 {
-        press_key(&mut app1, KeyCode::W);
+        press_key(&mut app1, Key::Character("w".into()), KeyCode::KeyW);
         app1.update();
         app2.update();
     }
@@ -138,14 +140,14 @@ const INPUT_UP: u8 = 1 << 0;
 
 pub fn read_local_inputs(
     mut commands: Commands,
-    keyboard_input: Res<Input<KeyCode>>,
+    keyboard_input: Res<ButtonInput<KeyCode>>,
     local_players: Res<LocalPlayers>,
 ) {
     let mut local_inputs = HashMap::new();
 
     for handle in &local_players.0 {
         let mut input: u8 = 0;
-        if keyboard_input.pressed(KeyCode::W) {
+        if keyboard_input.pressed(KeyCode::KeyW) {
             input |= INPUT_UP;
         }
         local_inputs.insert(*handle, BoxInput { inp: input });
@@ -158,10 +160,10 @@ pub fn increase_frame_system(mut frame_count: ResMut<FrameCount>) {
     frame_count.frame += 1;
 }
 
-fn press_key(app: &mut App, key: KeyCode) {
+fn press_key(app: &mut App, key: Key, key_code: KeyCode) {
     app.world.send_event(KeyboardInput {
-        scan_code: 0,
-        key_code: Option::from(key),
+        logical_key: key,
+        key_code,
         state: ButtonState::Pressed,
         window: Entity::PLACEHOLDER,
     });

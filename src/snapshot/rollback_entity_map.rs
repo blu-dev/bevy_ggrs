@@ -1,19 +1,19 @@
-use bevy::{prelude::*, utils::HashMap};
+use bevy::{ecs::entity::EntityHashMap, prelude::*};
 
 /// A [`Resource`] which provides an [`EntityMap`], describing how [`Entities`](`Entity`)
 /// changed during a rollback.
 #[derive(Resource, Default)]
-pub struct RollbackEntityMap(HashMap<Entity, Entity>);
+pub struct RollbackEntityMap(EntityHashMap<Entity>);
 
 impl RollbackEntityMap {
     /// Create a new [`RollbackEntityMap`], which can generate [`EntityMaps`](`EntityMap`) as required.
-    pub fn new(map: HashMap<Entity, Entity>) -> Self {
+    pub fn new(map: EntityHashMap<Entity>) -> Self {
         Self(map)
     }
 
     /// Generate an owned [`EntityMap`], which can be used concurrently with other systems.
-    pub fn generate_map(&self) -> HashMap<Entity, Entity> {
-        let mut map = HashMap::<Entity, Entity>::default();
+    pub fn generate_map(&self) -> EntityHashMap<Entity> {
+        let mut map = EntityHashMap::<Entity>::default();
 
         for (original, mapped) in self.iter() {
             map.insert(original, mapped);

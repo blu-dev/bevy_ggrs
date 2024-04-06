@@ -1,7 +1,7 @@
 use std::marker::PhantomData;
 
 use bevy::{
-    ecs::entity::{EntityMapper, MapEntities},
+    ecs::entity::{MapEntities, SceneEntityMapper},
     prelude::*,
 };
 
@@ -74,7 +74,7 @@ where
 {
     let mut applied_entity_map = map.generate_map();
 
-    EntityMapper::world_scope(&mut applied_entity_map, world, apply_map::<C>);
+    SceneEntityMapper::world_scope(&mut applied_entity_map, world, apply_map::<C>);
 
     trace!(
         "Mapped {}",
@@ -100,7 +100,7 @@ where
         }
 
         // Map entities a second time, fixing dead entities
-        EntityMapper::world_scope(&mut applied_entity_map, world, apply_map::<C>);
+        SceneEntityMapper::world_scope(&mut applied_entity_map, world, apply_map::<C>);
 
         trace!(
             "Re-Mapped {}",
@@ -109,7 +109,7 @@ where
     }
 }
 
-fn apply_map<C: Component + MapEntities>(world: &mut World, entity_mapper: &mut EntityMapper) {
+fn apply_map<C: Component + MapEntities>(world: &mut World, entity_mapper: &mut SceneEntityMapper) {
     let entities = entity_mapper
         .get_map()
         .values()

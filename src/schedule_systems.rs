@@ -122,7 +122,7 @@ pub(crate) fn run_spectator<T: Config>(world: &mut World, mut sess: SpectatorSes
 pub(crate) fn run_p2p<C: Config>(world: &mut World, mut sess: P2PSession<C>) {
     world.insert_resource(LocalPlayers(sess.local_player_handles()));
 
-    let running = sess.current_state() == SessionState::Running;
+    let running = dbg!(sess.current_state()) == SessionState::Running;
 
     if running {
         // get local player inputs
